@@ -9,6 +9,7 @@ interface MarketInfo {
     ytAddress?: string;
     ptAddress?: string;
     lpAddress?: string;
+    chain: string;
 }
 
 let webMarkets: MarketInfo[] = [];
@@ -77,6 +78,14 @@ test.describe("Pendle markets comparison", () => {
                 }
 
                 if (name) {
+                    const chain =
+                        ytAddress?.match(/chain=([^&]+)/)?.[1] ||
+                        ptAddress?.match(/chain=([^&]+)/)?.[1] ||
+                        "unknown";
+
+                    const cleanYtAddress = ytAddress?.split("?")?.[0] || "";
+                    const cleanPtAddress = ptAddress?.split("?")?.[0] || "";
+
                     webMarkets.push({
                         name: name.trim(),
                         expiry,
@@ -84,13 +93,15 @@ test.describe("Pendle markets comparison", () => {
                         ytAddress,
                         ptAddress,
                         lpAddress,
+                        chain,
                     });
                     log(
                         `Market: ${name.trim()}, Expiry: ${expiry}, Days: ${days.trim()}`
                     );
-                    log(`  YT: ${ytAddress}`);
-                    log(`  PT: ${ptAddress}`);
-                    log(`  LP: ${lpAddress}`);
+                    log(`  YT: ${cleanYtAddress}`);
+                    log(`  PT: ${cleanPtAddress}`);
+                    log(`  LP: `);
+                    log(`  Chain: ${chain}`);
                     log("");
                 }
             } catch (error) {
@@ -104,9 +115,7 @@ test.describe("Pendle markets comparison", () => {
         log(`Found ${apiMarkets.length} V1 markets from API`);
 
         const ethereumMarkets = webMarkets.filter(
-            (market) =>
-                market.ytAddress?.includes("chain=ethereum") ||
-                market.ptAddress?.includes("chain=ethereum")
+            (market) => market.chain === "ethereum"
         );
         log(
             `Found ${ethereumMarkets.length} Ethereum chain markets on web page`
@@ -142,9 +151,10 @@ test.describe("Pendle markets comparison", () => {
             log(`  Days until expiry: ${market.daysUntilExpiry}`);
             log(`  API Address: ${apiMarket?.address}`);
             log(`  Web Addresses:`);
-            log(`    YT: ${market.ytAddress}`);
-            log(`    PT: ${market.ptAddress}`);
-            log(`    LP: ${market.lpAddress}`);
+            log(`    YT: ${ytAddress}`);
+            log(`    PT: ${ptAddress}`);
+            log(`    LP: `);
+            log(`  Chain: ${market.chain}`);
             log("");
         });
 
