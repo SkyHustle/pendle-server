@@ -69,21 +69,34 @@ async function main() {
         console.log("Fetching active Pendle V1 markets via API...\n");
         const markets = await getActiveMarkets();
 
-        console.log(`Found ${markets.length} active V1 markets`);
+        console.log(`Found ${markets.length} active V1 markets\n`);
 
-        if (markets.length > 0) {
-            console.log("\nFirst market details:");
-            const firstMarket = markets[0];
-            console.log({
-                name: firstMarket.name,
-                address: firstMarket.address,
-                expiry: firstMarket.expiry,
-                pt: firstMarket.pt,
-                yt: firstMarket.yt,
-                sy: firstMarket.sy,
-                underlyingAsset: firstMarket.underlyingAsset,
-            });
-        }
+        // Calculate days until expiry for each market
+        const marketsWithDays = markets.map((market) => {
+            const expiryDate = new Date(market.expiry);
+            const now = new Date();
+            const daysUntilExpiry = Math.ceil(
+                (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            return {
+                name: market.name,
+                daysUntilExpiry,
+            };
+        });
+
+        // Sort by days until expiry
+        marketsWithDays.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+
+        // Display all markets
+        console.log("All active markets (sorted by days until expiry):");
+        console.log("---------------------------------------------");
+        marketsWithDays.forEach((market) => {
+            console.log(
+                `${market.name.padEnd(20)} | ${
+                    market.daysUntilExpiry
+                } days until expiry`
+            );
+        });
     } catch (error) {
         if (error instanceof AxiosError) {
             console.error("API Error:", error.response?.data || error.message);
