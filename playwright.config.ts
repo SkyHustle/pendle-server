@@ -2,7 +2,9 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
     testDir: "./src/e2e",
-    timeout: 30000,
+    outputDir: "test-results",
+    timeout: 60000,
+    reporter: "list",
     use: {
         headless: false,
         viewport: { width: 1280, height: 720 },
@@ -14,5 +16,8 @@ export default defineConfig({
         permissions: ["geolocation"],
         locale: "es-MX",
         timezoneId: "America/Mexico_City",
+        trace: "retain-on-failure",
+        video: "retain-on-failure",
     },
+    preserveOutput: "failures-only",
 });

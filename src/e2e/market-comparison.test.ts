@@ -1,5 +1,6 @@
 import { test } from "@playwright/test";
 import { getActiveMarkets } from "../api-client";
+import * as fs from "fs";
 
 interface MarketInfo {
     name: string;
@@ -11,49 +12,55 @@ interface MarketInfo {
 }
 
 let webMarkets: MarketInfo[] = [];
+let testOutput: string[] = [];
+
+// Helper function to log both to console and to our output array
+function log(message: string) {
+    console.log(message);
+    testOutput.push(message);
+}
 
 // Helper function to normalize addresses for comparison
 function normalizeAddress(address: string | undefined): string {
-    // Remove query parameters and convert to lowercase
     return address?.split("?")?.[0]?.toLowerCase() || "";
 }
 
 test.describe("Pendle markets comparison", () => {
-    test("fetch all markets from web page", async ({ page }) => {
-        // Navigate to the markets page
-        await page.goto("https://app.pendle.finance/pro/markets");
+    test.afterAll(async () => {
+        // Write all output to a file
+        fs.writeFileSync("test-results/test-output.txt", testOutput.join("\n"));
+    });
 
-        // Wait for content to load
+    test("fetch all markets from web page", async ({ page }) => {
+        // Reset output array at the start of tests
+        testOutput = [];
+
+        await page.goto("https://app.pendle.finance/pro/markets");
         await page.waitForSelector("pp-tr", { timeout: 10000 });
 
-        // Click "Show All" button
         const showAllButton = await page.getByText("Show All");
         await showAllButton.click();
 
-        // Wait for additional markets to load
-        await page.waitForTimeout(2000);
-        await page.screenshot({ path: "markets-page.png", fullPage: true });
+        await page.waitForTimeout(5000);
+        await page.screenshot({
+            path: "test-results/markets-page.png",
+            fullPage: true,
+        });
 
-        // Get all market rows
         const rows = await page.$$("pp-tr");
-        console.log(`Found ${rows.length} market rows on web page`);
+        log(`Found ${rows.length} market rows on web page`);
 
-        // Extract market names and expiry dates
         for (const row of rows) {
             try {
-                // Get market name from the first cell's div structure
                 const nameDiv = await row.$(".font-bold");
                 const name = (await nameDiv?.textContent()) || "";
 
-                // Get expiry date from the span with title attribute
                 const expirySpan = await row.$(".text-water-300[title]");
                 const expiry = (await expirySpan?.getAttribute("title")) || "";
 
-                // Get days until expiry
                 const daysSpan = await row.$(".text-water-400 span");
                 const days = (await daysSpan?.textContent()) || "";
 
-                // Extract market addresses from links
                 const links = await row.$$("a[href*='/trade/']");
                 let ytAddress = "",
                     ptAddress = "",
@@ -78,41 +85,37 @@ test.describe("Pendle markets comparison", () => {
                         ptAddress,
                         lpAddress,
                     });
-                    console.log(
+                    log(
                         `Market: ${name.trim()}, Expiry: ${expiry}, Days: ${days.trim()}`
                     );
-                    console.log(`  YT: ${ytAddress}`);
-                    console.log(`  PT: ${ptAddress}`);
-                    console.log(`  LP: ${lpAddress}`);
-                    console.log();
+                    log(`  YT: ${ytAddress}`);
+                    log(`  PT: ${ptAddress}`);
+                    log(`  LP: ${lpAddress}`);
+                    log("");
                 }
             } catch (error) {
-                console.error("Error extracting data from row:", error);
+                log(`Error extracting data from row: ${error}`);
             }
         }
     });
 
     test("compare V1 markets from API with web markets", async () => {
-        // Get V1 markets from API
         const apiMarkets = await getActiveMarkets();
-        console.log(`Found ${apiMarkets.length} V1 markets from API`);
+        log(`Found ${apiMarkets.length} V1 markets from API`);
 
-        // Filter web markets to only include Ethereum chain markets
         const ethereumMarkets = webMarkets.filter(
             (market) =>
                 market.ytAddress?.includes("chain=ethereum") ||
                 market.ptAddress?.includes("chain=ethereum")
         );
-        console.log(
+        log(
             `Found ${ethereumMarkets.length} Ethereum chain markets on web page`
         );
 
-        // Create a map of API markets by address for easier lookup
         const apiMarketsByAddress = new Map(
             apiMarkets.map((market) => [market.address.toLowerCase(), market])
         );
 
-        // Find which V1 markets are shown on the web page
         const v1MarketsOnWeb = ethereumMarkets.filter((webMarket) => {
             const ytAddress = normalizeAddress(webMarket.ytAddress);
             const ptAddress = normalizeAddress(webMarket.ptAddress);
@@ -122,33 +125,29 @@ test.describe("Pendle markets comparison", () => {
             );
         });
 
-        console.log("\nMarket Comparison Summary:");
-        console.log(
-            `Total Ethereum markets on web page: ${ethereumMarkets.length}`
-        );
-        console.log(`Total V1 markets from API: ${apiMarkets.length}`);
-        console.log(`V1 markets found on web page: ${v1MarketsOnWeb.length}`);
+        log("\nMarket Comparison Summary:");
+        log(`Total Ethereum markets on web page: ${ethereumMarkets.length}`);
+        log(`Total V1 markets from API: ${apiMarkets.length}`);
+        log(`V1 markets found on web page: ${v1MarketsOnWeb.length}`);
 
-        // Log V1 markets found on web page with their details
-        console.log("\nV1 Markets found on web page:");
+        log("\nV1 Markets found on web page:");
         v1MarketsOnWeb.forEach((market) => {
             const ytAddress = normalizeAddress(market.ytAddress);
             const ptAddress = normalizeAddress(market.ptAddress);
             const apiMarket =
                 apiMarketsByAddress.get(ytAddress) ||
                 apiMarketsByAddress.get(ptAddress);
-            console.log(`- ${market.name}`);
-            console.log(`  Web Expiry: ${market.expiry}`);
-            console.log(`  Days until expiry: ${market.daysUntilExpiry}`);
-            console.log(`  API Address: ${apiMarket?.address}`);
-            console.log(`  Web Addresses:`);
-            console.log(`    YT: ${market.ytAddress}`);
-            console.log(`    PT: ${market.ptAddress}`);
-            console.log(`    LP: ${market.lpAddress}`);
-            console.log();
+            log(`- ${market.name}`);
+            log(`  Web Expiry: ${market.expiry}`);
+            log(`  Days until expiry: ${market.daysUntilExpiry}`);
+            log(`  API Address: ${apiMarket?.address}`);
+            log(`  Web Addresses:`);
+            log(`    YT: ${market.ytAddress}`);
+            log(`    PT: ${market.ptAddress}`);
+            log(`    LP: ${market.lpAddress}`);
+            log("");
         });
 
-        // Log V1 markets that are in API but not on web page
         const webAddresses = new Set(
             ethereumMarkets.flatMap((m) => [
                 normalizeAddress(m.ytAddress),
@@ -160,15 +159,15 @@ test.describe("Pendle markets comparison", () => {
             (market) => !webAddresses.has(market.address.toLowerCase())
         );
 
-        console.log("\nV1 Markets in API but not found on web page:");
+        log("\nV1 Markets in API but not found on web page:");
         missingFromWeb.forEach((market) => {
-            console.log(`- ${market.name}`);
-            console.log(`  Expiry: ${market.expiry}`);
-            console.log(`  Address: ${market.address}`);
-            console.log();
+            log(`- ${market.name}`);
+            log(`  Expiry: ${market.expiry}`);
+            log(`  Address: ${market.address}`);
+            log("");
         });
 
-        // Log web markets that are not V1 markets
+        // Find web markets that are not V1 markets
         const nonV1Markets = ethereumMarkets.filter((web) => {
             const ytAddress = normalizeAddress(web.ytAddress);
             const ptAddress = normalizeAddress(web.ptAddress);
@@ -178,14 +177,14 @@ test.describe("Pendle markets comparison", () => {
             );
         });
 
-        console.log("\nEthereum chain markets that are not V1 markets:");
+        log("\nEthereum chain markets that are not V1 markets:");
         nonV1Markets.forEach((market) => {
-            console.log(`- ${market.name}`);
-            console.log(`  Expiry: ${market.expiry}`);
-            console.log(`  YT: ${market.ytAddress}`);
-            console.log(`  PT: ${market.ptAddress}`);
-            console.log(`  LP: ${market.lpAddress}`);
-            console.log();
+            log(`- ${market.name}`);
+            log(`  Expiry: ${market.expiry}`);
+            log(`  YT: ${market.ytAddress}`);
+            log(`  PT: ${market.ptAddress}`);
+            log(`  LP: ${market.lpAddress}`);
+            log("");
         });
     });
 });
