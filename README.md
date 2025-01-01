@@ -11,6 +11,29 @@ The main functionality includes:
 -   Verifying market details including names, addresses, and expiry dates
 -   Logging detailed comparison results for analysis
 
+## Architecture
+
+The project is organized into several layers:
+
+### Core Layer (`src/core/`)
+
+-   Contains the core business logic and types
+-   Includes market interfaces and shared utilities
+-   Chain-agnostic code that can be reused across different implementations
+
+### Data Layer (`src/data/`)
+
+-   Different implementations for fetching market data:
+    -   `chain/`: Direct blockchain interaction using ethers.js
+    -   `api/`: REST API client implementation
+    -   Common interfaces for data sources
+
+### Tests (`src/tests/`)
+
+-   `e2e/`: End-to-end tests comparing different data sources
+-   `integration/`: Tests for individual data sources
+-   `unit/`: Unit tests for core business logic
+
 ## Setup
 
 ### Prerequisites
@@ -60,11 +83,19 @@ The tests will:
 ```
 pendle-server/
 ├── src/
-│   ├── api-client/      # API client for fetching V1 markets
-│   └── e2e/            # End-to-end tests
-├── test-results/       # Test outputs and screenshots (git-ignored)
+│   ├── core/           # Core business logic and types
+│   │   ├── types/     # Shared type definitions
+│   │   └── utils/     # Shared utilities
+│   ├── data/          # Data access layer
+│   │   ├── chain/     # Blockchain interaction (ethers.js)
+│   │   └── api/       # REST API client
+│   └── tests/         # All tests
+│       ├── e2e/       # End-to-end tests
+│       ├── integration/ # Integration tests
+│       └── unit/      # Unit tests
+├── test-results/      # Test outputs and screenshots (git-ignored)
 ├── playwright.config.ts # Playwright configuration
-└── package.json        # Project dependencies and scripts
+└── package.json       # Project dependencies and scripts
 ```
 
 ## Test Output
