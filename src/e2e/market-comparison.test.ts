@@ -97,13 +97,23 @@ test.describe("Pendle markets comparison", () => {
         const apiMarkets = await getActiveMarkets();
         console.log(`Found ${apiMarkets.length} V1 markets from API`);
 
+        // Filter web markets to only include Ethereum chain markets
+        const ethereumMarkets = webMarkets.filter(
+            (market) =>
+                market.ytAddress?.includes("chain=ethereum") ||
+                market.ptAddress?.includes("chain=ethereum")
+        );
+        console.log(
+            `Found ${ethereumMarkets.length} Ethereum chain markets on web page`
+        );
+
         // Create a map of API markets by address for easier lookup
         const apiMarketsByAddress = new Map(
             apiMarkets.map((market) => [market.address.toLowerCase(), market])
         );
 
         // Find which V1 markets are shown on the web page
-        const v1MarketsOnWeb = webMarkets.filter((webMarket) => {
+        const v1MarketsOnWeb = ethereumMarkets.filter((webMarket) => {
             const ytAddress = normalizeAddress(webMarket.ytAddress);
             const ptAddress = normalizeAddress(webMarket.ptAddress);
             return (
@@ -113,7 +123,9 @@ test.describe("Pendle markets comparison", () => {
         });
 
         console.log("\nMarket Comparison Summary:");
-        console.log(`Total markets on web page: ${webMarkets.length}`);
+        console.log(
+            `Total Ethereum markets on web page: ${ethereumMarkets.length}`
+        );
         console.log(`Total V1 markets from API: ${apiMarkets.length}`);
         console.log(`V1 markets found on web page: ${v1MarketsOnWeb.length}`);
 
@@ -138,7 +150,7 @@ test.describe("Pendle markets comparison", () => {
 
         // Log V1 markets that are in API but not on web page
         const webAddresses = new Set(
-            webMarkets.flatMap((m) => [
+            ethereumMarkets.flatMap((m) => [
                 normalizeAddress(m.ytAddress),
                 normalizeAddress(m.ptAddress),
             ])
@@ -157,7 +169,7 @@ test.describe("Pendle markets comparison", () => {
         });
 
         // Log web markets that are not V1 markets
-        const nonV1Markets = webMarkets.filter((web) => {
+        const nonV1Markets = ethereumMarkets.filter((web) => {
             const ytAddress = normalizeAddress(web.ytAddress);
             const ptAddress = normalizeAddress(web.ptAddress);
             return (
@@ -166,7 +178,7 @@ test.describe("Pendle markets comparison", () => {
             );
         });
 
-        console.log("\nWeb markets that are not V1 markets:");
+        console.log("\nEthereum chain markets that are not V1 markets:");
         nonV1Markets.forEach((market) => {
             console.log(`- ${market.name}`);
             console.log(`  Expiry: ${market.expiry}`);
