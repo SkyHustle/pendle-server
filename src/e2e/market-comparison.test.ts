@@ -15,67 +15,92 @@ interface MarketInfo {
 let webMarkets: MarketInfo[] = [];
 let testOutput: string[] = [];
 
-// Helper function to log both to console and to our output array
 function log(message: string) {
     console.log(message);
     testOutput.push(message);
 }
 
-// Helper function to normalize addresses for comparison
 function normalizeAddress(address: string | undefined): string {
     return address?.split("?")?.[0]?.toLowerCase() || "";
 }
 
 test.describe("Pendle markets comparison", () => {
     test.afterAll(async () => {
-        // Write all output to a file
         fs.writeFileSync("test-results/test-output.txt", testOutput.join("\n"));
     });
 
     test("fetch all markets from web page", async ({ page }) => {
-        // Reset output array at the start of tests
         testOutput = [];
 
+        // Navigate and wait for initial load
         await page.goto("https://app.pendle.finance/pro/markets");
-        await page.waitForSelector("pp-tr", { timeout: 10000 });
 
+        // Wait for the first market row to be visible
+        await page.waitForSelector("pp-tr", {
+            state: "visible",
+            timeout: 10000,
+        });
+
+        // Click "Show All" and wait for new markets to load
         const showAllButton = await page.getByText("Show All");
         await showAllButton.click();
 
-        await page.waitForTimeout(5000);
-        await page.screenshot({
-            path: "test-results/markets-page.png",
-            fullPage: true,
-        });
+        // Wait for the market list to stabilize (no new items being added)
+        let previousCount = 0;
+        let currentCount = 0;
+        let stabilityCounter = 0;
+
+        while (stabilityCounter < 3) {
+            await page.waitForTimeout(500); // Short interval check
+            currentCount = await page.$$eval("pp-tr", (rows) => rows.length);
+
+            if (currentCount === previousCount) {
+                stabilityCounter++;
+            } else {
+                stabilityCounter = 0;
+            }
+
+            previousCount = currentCount;
+        }
 
         const rows = await page.$$("pp-tr");
         log(`Found ${rows.length} market rows on web page`);
 
-        for (const row of rows) {
+        // Process all rows in parallel
+        const marketPromises = rows.map(async (row) => {
             try {
-                const nameDiv = await row.$(".font-bold");
-                const name = (await nameDiv?.textContent()) || "";
-
-                const expirySpan = await row.$(".text-water-300[title]");
-                const expiry = (await expirySpan?.getAttribute("title")) || "";
-
-                const daysSpan = await row.$(".text-water-400 span");
-                const days = (await daysSpan?.textContent()) || "";
+                const [name, expiry, days] = await Promise.all([
+                    row.$eval(".font-bold", (el) => el.textContent || ""),
+                    row.$eval(
+                        ".text-water-300[title]",
+                        (el) => el.getAttribute("title") || ""
+                    ),
+                    row.$eval(
+                        ".text-water-400 span",
+                        (el) => el.textContent || ""
+                    ),
+                ]);
 
                 const links = await row.$$("a[href*='/trade/']");
+                const addressPromises = links.map(async (link) => {
+                    const [href, type] = await Promise.all([
+                        link.getAttribute("href"),
+                        link.textContent(),
+                    ]);
+                    return { href: href || "", type: type || "" };
+                });
+
+                const addresses = await Promise.all(addressPromises);
                 let ytAddress = "",
                     ptAddress = "",
                     lpAddress = "";
 
-                for (const link of links) {
-                    const href = (await link.getAttribute("href")) || "";
-                    const type = await link.textContent();
+                addresses.forEach(({ href, type }) => {
                     const address = href.split("/").pop() || "";
-
                     if (type?.includes("YT")) ytAddress = address;
                     else if (type?.includes("PT")) ptAddress = address;
                     else if (type?.includes("LP")) lpAddress = address;
-                }
+                });
 
                 if (name) {
                     const chain =
@@ -86,7 +111,7 @@ test.describe("Pendle markets comparison", () => {
                     const cleanYtAddress = ytAddress?.split("?")?.[0] || "";
                     const cleanPtAddress = ptAddress?.split("?")?.[0] || "";
 
-                    webMarkets.push({
+                    const marketInfo: MarketInfo = {
                         name: name.trim(),
                         expiry,
                         daysUntilExpiry: days.trim(),
@@ -94,7 +119,8 @@ test.describe("Pendle markets comparison", () => {
                         ptAddress,
                         lpAddress,
                         chain,
-                    });
+                    };
+
                     log(
                         `Market: ${name.trim()}, Expiry: ${expiry}, Days: ${days.trim()}`
                     );
@@ -103,14 +129,23 @@ test.describe("Pendle markets comparison", () => {
                     log(`  LP: `);
                     log(`  Chain: ${chain}`);
                     log("");
+
+                    return marketInfo;
                 }
             } catch (error) {
                 log(`Error extracting data from row: ${error}`);
+                return null;
             }
-        }
+        });
+
+        const markets = (await Promise.all(marketPromises)).filter(
+            (m): m is MarketInfo => m !== null
+        );
+        webMarkets = markets;
     });
 
     test("compare V1 markets from API with web markets", async () => {
+        // Fetch API markets in parallel with web markets processing
         const apiMarkets = await getActiveMarkets();
         log(`Found ${apiMarkets.length} V1 markets from API`);
 
@@ -177,7 +212,6 @@ test.describe("Pendle markets comparison", () => {
             log("");
         });
 
-        // Find web markets that are not V1 markets
         const nonV1Markets = ethereumMarkets.filter((web) => {
             const ytAddress = normalizeAddress(web.ytAddress);
             const ptAddress = normalizeAddress(web.ptAddress);
@@ -191,9 +225,10 @@ test.describe("Pendle markets comparison", () => {
         nonV1Markets.forEach((market) => {
             log(`- ${market.name}`);
             log(`  Expiry: ${market.expiry}`);
-            log(`  YT: ${market.ytAddress}`);
-            log(`  PT: ${market.ptAddress}`);
-            log(`  LP: ${market.lpAddress}`);
+            log(`  YT: ${normalizeAddress(market.ytAddress)}`);
+            log(`  PT: ${normalizeAddress(market.ptAddress)}`);
+            log(`  LP: `);
+            log(`  Chain: ${market.chain}`);
             log("");
         });
     });
