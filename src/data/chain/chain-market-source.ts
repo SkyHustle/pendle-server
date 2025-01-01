@@ -120,6 +120,7 @@ export class ChainMarketSource implements MarketDataSource {
 
             return {
                 address: marketAddress,
+                name: syInfo.name || "Unknown Market",
                 factory: factoryAddress,
                 PT: ptInfo,
                 YT: { address: YT },

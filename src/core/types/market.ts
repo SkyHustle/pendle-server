@@ -16,6 +16,7 @@ export interface MarketState {
 
 export interface Market {
     address: string;
+    name: string;
     factory?: string;
     PT: Token;
     YT: Token;
