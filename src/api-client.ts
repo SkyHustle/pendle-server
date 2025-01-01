@@ -12,6 +12,10 @@ export interface MarketData {
     underlyingAsset: string;
 }
 
+/**
+ * Fetches all active Pendle V1 markets for a given chain
+ * For V5 markets, use the on-chain implementation in index.ts
+ */
 export async function getActiveMarkets(
     chainId: number = 1
 ): Promise<MarketData[]> {
@@ -33,6 +37,10 @@ export async function getActiveMarkets(
     }
 }
 
+/**
+ * Fetches details for a specific Pendle V1 market
+ * For V5 markets, use the on-chain implementation in index.ts
+ */
 export async function getMarketData(
     marketAddress: string,
     chainId: number = 1
@@ -58,10 +66,10 @@ export async function getMarketData(
 // Example usage
 async function main() {
     try {
-        console.log("Fetching active Pendle markets via API...\n");
+        console.log("Fetching active Pendle V1 markets via API...\n");
         const markets = await getActiveMarkets();
 
-        console.log(`Found ${markets.length} active markets`);
+        console.log(`Found ${markets.length} active V1 markets`);
 
         if (markets.length > 0) {
             console.log("\nFirst market details:");
