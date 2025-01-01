@@ -35,24 +35,23 @@ test.describe("Pendle markets comparison", () => {
         // Navigate and wait for initial load
         await page.goto("https://app.pendle.finance/pro/markets");
 
-        // Wait for the first market row to be visible
+        // Wait for the first market row to be visible and clickable
         await page.waitForSelector("pp-tr", {
             state: "visible",
             timeout: 10000,
         });
 
         // Click "Show All" and wait for new markets to load
-        const showAllButton = await page.getByText("Show All");
-        await showAllButton.click();
+        await page.getByText("Show All").click();
 
         // Wait for the market list to stabilize (no new items being added)
         let previousCount = 0;
         let currentCount = 0;
         let stabilityCounter = 0;
 
-        while (stabilityCounter < 3) {
-            await page.waitForTimeout(500); // Short interval check
-            currentCount = await page.$$eval("pp-tr", (rows) => rows.length);
+        while (stabilityCounter < 2) {
+            await page.waitForTimeout(200);
+            currentCount = await page.locator("pp-tr").count();
 
             if (currentCount === previousCount) {
                 stabilityCounter++;
@@ -63,13 +62,15 @@ test.describe("Pendle markets comparison", () => {
             previousCount = currentCount;
         }
 
+        // Get all rows at once
         const rows = await page.$$("pp-tr");
         log(`Found ${rows.length} market rows on web page`);
 
         // Process all rows in parallel
         const marketPromises = rows.map(async (row) => {
             try {
-                const [name, expiry, days] = await Promise.all([
+                // Get all data in parallel using $eval for type safety
+                const [name, expiry, days, links] = await Promise.all([
                     row.$eval(".font-bold", (el) => el.textContent || ""),
                     row.$eval(
                         ".text-water-300[title]",
@@ -79,18 +80,23 @@ test.describe("Pendle markets comparison", () => {
                         ".text-water-400 span",
                         (el) => el.textContent || ""
                     ),
+                    row.$$("a[href*='/trade/']"),
                 ]);
 
-                const links = await row.$$("a[href*='/trade/']");
-                const addressPromises = links.map(async (link) => {
-                    const [href, type] = await Promise.all([
-                        link.getAttribute("href"),
-                        link.textContent(),
-                    ]);
-                    return { href: href || "", type: type || "" };
-                });
+                // Process addresses in parallel with proper typing
+                const addresses = await Promise.all(
+                    links.map(async (link) => {
+                        const [href, type] = await Promise.all([
+                            link.getAttribute("href"),
+                            link.textContent(),
+                        ]);
+                        return {
+                            href: href || "",
+                            type: type || "",
+                        };
+                    })
+                );
 
-                const addresses = await Promise.all(addressPromises);
                 let ytAddress = "",
                     ptAddress = "",
                     lpAddress = "";
