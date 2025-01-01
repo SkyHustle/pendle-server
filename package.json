@@ -1,0 +1,25 @@
+{
+    "name": "pendle",
+    "version": "1.0.0",
+    "description": "Script to interact with Pendle contracts",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "ts-node src/index.ts",
+        "dev": "ts-node-dev --respawn src/index.ts",
+        "clean": "rm -rf node_modules dist pnpm-lock.yaml"
+    },
+    "keywords": [
+        "pendle",
+        "DeFi"
+    ],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@types/node": "^22.10.2",
+        "dotenv": "^16.4.7",
+        "ethers": "^5.7.2",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.7.2"
+    }
+}
