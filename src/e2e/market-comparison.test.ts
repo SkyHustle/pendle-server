@@ -7,6 +7,13 @@ test("count market rows and extract names", async ({ page }) => {
 
     // Wait for content to load
     await page.waitForSelector("pp-tr", { timeout: 10000 });
+
+    // Click "Show All" button
+    const showAllButton = await page.getByText("Show All");
+    await showAllButton.click();
+
+    // Wait for additional markets to load
+    await page.waitForTimeout(2000);
     await page.screenshot({ path: "markets-page.png", fullPage: true });
 
     // Get all market rows
